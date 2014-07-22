@@ -1,0 +1,87 @@
+# -*- coding: utf-8 -*-
+
+# Passed to PRAW to identify with reddit. Should be contact details in case the bot goes ary.
+REDDIT_USERAGENT = ""
+
+# Reddit user details.
+#    Needs:
+#    * Commenting rights to REDDIT_PROPOSAL_SUBREDDIT
+#    * Wiki edit/create rights to REDDIT_MAIN_SUBREDDIT
+REDDIT_USER = ""
+REDDIT_PASSWORD = ""
+
+# Posts parsed here for proposals
+REDDIT_PROPOSAL_SUBREDDIT = ""
+
+# Used for wiki and weekly posts
+REDDIT_MAIN_SUBREDDIT =""
+
+# Comment left on all new proposals, replies to this used for a vote.
+REDDIT_PROPOSAL_COMMENT = """
+#FAO Ministers
+When this proposal has been finalised please vote by replying to this comment with 'yes' or 'no'. 
+
+If more than 51% of ministers reply with 'yes' this will become law. If less than 51% of ministers reply with 'yes' it will be rejected.
+---
+*Note: I am a bot. Please PM /u/Thiecec if I'm acting up.*
+"""
+
+# Comment edited onto new proposals when there is a successful vote.
+#    Is fed (in this order):
+#    vote_no, vote_yes
+REDDIT_PROPOSAL_COMMENT_APPROVED = """
+This proposal has been approved %s to %s.
+
+It is law effective from now.
+---
+*Note: I am a bot. Please PM /u/Thiecec if I'm acting up.*
+"""
+
+# Comment edited onto new proposals when there is an unsuccessful vote.
+#    Is fed (in this order):
+#    vote_no, vote_yes
+REDDIT_PROPOSAL_COMMENT_REJECTED = """
+This proposal has been rejected %s to %s.
+
+It has failed to become law.
+---
+*Note: I am a bot. Please PM /u/Thiecec if I'm acting up.*
+"""
+
+# Only usernames in this list can vote
+# DYNAMICALLY POPULATED ON LOAD
+ALLOWED_VOTERS = []
+
+# Wiki page for index of approved proposals 
+PROPOSAL_WIKI_PAGE = "laws"
+
+# Header for the index of approved proposals
+PROPOSAL_WIKI_HEADER = """
+# Approved Proposals (Law)
+Please note this wiki page and its sub-pages are automatically generated.\n
+*If you notice any errors please PM /u/Thiecec.*
+\n
+"""
+
+# Template for each index item in the index of approved proposals
+#    Is fed (in this order):
+#    Title, Author, Date, Link to individual proposal wiki page
+PROPOSAL_WIKI_TEMPLATE = "* [ **%s** by *%s* (%s)](%s)\n"
+
+# Used in the wiki URL layout
+PROPOSAL_IDENTIFIER = "proposal"
+
+# Template for URLs used for individual proposal wiki pages
+#    Is fed (in this order):
+#    Wiki subreddit, Proposal identifier, Date
+PROPOSAL_WIKI_URL_LAYOUT = "http://reddit.com/r/%s/wiki/%s%s"
+
+# Template for the individual proposal wiki pages
+#    Is fed (in this order):
+#    Title, Author, Date, Contents
+PROPOSAL_WIKI_PAGE_LAYOUT = """
+# %s
+## %s (%s)
+
+%s
+"""
