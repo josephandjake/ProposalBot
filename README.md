@@ -16,3 +16,4 @@ A Reddit bot to automagically handle the administration of proposals and laws in
 * Weekly post of approved proposals to main subreddit.
 * Better handling of inserted markdown in a proposal.
 * Implement a database layer that hooks into PostGreSQL instead of a flat file database.
+* Support for repealing a proposal
