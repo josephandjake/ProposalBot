@@ -37,6 +37,9 @@ except:
 
 r = praw.Reddit(user_agent=settings.REDDIT_USERAGENT)
 
+# Move to settings.py?
+proposal_keywords = ['PROPOSAL'] 
+
 # Check and update Proposals
 def check_and_update_proposals():
     r.login(settings.REDDIT_USER, settings.REDDIT_PASSWORD)
@@ -49,114 +52,123 @@ def check_and_update_proposals():
     for x in submissions:
         print "Processing submission", x.id
         
-        # This block of code iterates over existing proposals
-        #    and populates variables if x is already processed.
-        status = 0
-        pretty_itty = -1
-        for proposal in proposal_container:
-            pretty_itty += 1
-            if proposal.date == x.created_utc:
-                print x.id, "is already on the system as status", proposal.status
-                status = proposal.status
-                proposal_object = proposal
-        #
-        
-        # This block runs if the proposal has never been
-        #    processed before.
-        if status == 0:
-            print x.id, "has never been processed before."
+        # Check the title for proposal keywords so that this function
+        #   only processes topics that are creating a new proposal.
+        # This will allow us to remove/call a revote on 
+        #   already existing proposals.
+        title = x.title
+        if any(string in title for string in proposal_keywords):
+                
+            # This block of code iterates over existing proposals
+            #    and populates variables if x is already processed.
+            status = 0
+            pretty_itty = -1
+            for proposal in proposal_container:
+                pretty_itty += 1
+                # What if the proposal wasn't voted in the same day as the submission was posted?
+                if proposal.date == x.created_utc:
+                    print x.id, "is already on the system as status", proposal.status
+                    status = proposal.status
+                    proposal_object = proposal
+            #
             
-            # Create a comment on this post using
-            #     REDDIT_PROPOSAL_COMMENT as source. 
-            comment = x.add_comment(settings.REDDIT_PROPOSAL_COMMENT)
-
-            print "Added comment", comment.id, "to", x.id
+            # This block runs if the proposal has never been
+            #    processed before.
+            if status == 0:
+                print x.id, "has never been processed before."
+                
+                # Create a comment on this post using
+                #     REDDIT_PROPOSAL_COMMENT as source. 
+                comment = x.add_comment(settings.REDDIT_PROPOSAL_COMMENT)
+    
+                print "Added comment", comment.id, "to", x.id
+                
+                # Create a proposal instance and append it
+                #    to the list of exisiting proposals.
+                proposal_container.append(Proposal(x.title, x.created_utc, x.author, x.selftext, comment))
+                print "Created Proposal instance and added to container"
+    
+            # This block runs if the proposal has been
+            #    processed before but hasn't been rejected
+            #    or approved yet.
+            if status == 1:
+                # Update the proposal contents for this
+                #    proposal instance
+                proposal_object.update_contents(x.selftext)
+                print "Updated Proposal contents"
+    
+                # A hack to get the original 'please vote'
+                #   comment by the bot
+                s = r.get_submission(proposal_object.comment)
+                s = s.comments[0]
+    
+                # Reset values between each iteration.
+                vote_yes = vote_no = 0
+    
+                # Populate vote_once from the
+                #    ALLOWED_VOTERS variable
+                vote_once = settings.ALLOWED_VOTERS
+    
+                # Iterates over the replies to the
+                #    'please vote' comment and counts votes.
+                for reply in s.replies:
+    
+                    # Disallows if not in vote_once list.
+                    if reply.author.name in vote_once:
+    
+                        # Removes name if voted once, preventing dupes.
+                        vote_once.remove(reply.author.name)
+    
+                        # If they include 'yes' anywhere in their reply
+                        #    iterate vote_yes by 1.
+                        if 'yes' in reply.body:
+                            vote_yes += 1
+    
+                        # If they include 'no' anywhere in their reply
+                        #    iterate vote_no by 1.
+                        if 'no' in reply.body:
+                            vote_no += 1
+    
+                print "Counted the votes"
+    
+                # Process the counted votes if there is no one else
+                #     left to vote.
+                if not vote_once:
+                    print "Vote complete"
+    
+                    # If there are more 'yes' than 'no'.
+                    if vote_yes > vote_no:
+                        print "Proposal Approved, ", str(vote_yes) + ":" + str(vote_no)
+                        
+                        # Update comment to reflect the result.
+                        s.edit(settings.REDDIT_PROPOSAL_COMMENT_APPROVED % (str(vote_yes), str(vote_no)))
+                        
+                        # Update the proposal instance to reflect the result.
+                        proposal_object.update_status(3)
+                        proposal_object.update_date_completed()
+                    # If there are more 'no' than 'yes'.
+                    if vote_no > vote_yes:
+                        print "Proposal Rejected, ", str(vote_no) + ":" + str(vote_yes)
+                        
+                        # Update the comment to reflect the result.
+                        proposal_object.update_status(3)
+                        proposal_object.update_date_completed()
+    
+                        # Update the proposal instance to reflect the result.
+                        s.edit(settings.REDDIT_PROPOSAL_COMMENT_REJECTED % (str(vote_no), str(vote_yes)))
+                    # Update the proposal instance
+                    proposal_container[pretty_itty] = proposal_object
+                else:
+                    print "Incomplete vote, unable to decide"
+    
+            # End of processing
+            print "Sleeping for 100s"
+            time.sleep(100)
+            print "Pickling data to file"
+            prop_obj = open( "proposal_container.obj", "wb" )
+            pickle.dump(proposal_container, prop_obj)
+            prop_obj.close()
             
-            # Create a proposal instance and append it
-            #    to the list of exisiting proposals.
-            proposal_container.append(Proposal(x.title, x.created_utc, x.author, x.selftext, comment))
-            print "Created Proposal instance and added to container"
-
-        # This block runs if the proposal has been
-        #    processed before but hasn't been rejected
-        #    or approved yet.
-        if status == 1:
-            # Update the proposal contents for this
-            #    proposal instance
-            proposal_object.update_contents(x.selftext)
-            print "Updated Proposal contents"
-
-            # A hack to get the original 'please vote'
-            #   comment by the bot
-            s = r.get_submission(proposal_object.comment)
-            s = s.comments[0]
-
-            # Reset values between each iteration.
-            vote_yes = vote_no = 0
-
-            # Populate vote_once from the
-            #    ALLOWED_VOTERS variable
-            vote_once = settings.ALLOWED_VOTERS
-
-            # Iterates over the replies to the
-            #    'please vote' comment and counts votes.
-            for reply in s.replies:
-
-                # Disallows if not in vote_once list.
-                if reply.author.name in vote_once:
-
-                    # Removes name if voted once, preventing dupes.
-                    vote_once.remove(reply.author.name)
-
-                    # If they include 'yes' anywhere in their reply
-                    #    iterate vote_yes by 1.
-                    if 'yes' in reply.body:
-                        vote_yes += 1
-
-                    # If they include 'no' anywhere in their reply
-                    #    iterate vote_no by 1.
-                    if 'no' in reply.body:
-                        vote_no += 1
-
-            print "Counted the votes"
-
-            # Process the counted votes if there is no one else
-            #     left to vote.
-            if not vote_once:
-                print "Vote complete"
-
-                # If there are more 'yes' than 'no'.
-                if vote_yes > vote_no:
-                    print "Proposal Approved, ", str(vote_yes) + ":" + str(vote_no)
-                    
-                    # Update comment to reflect the result.
-                    s.edit(settings.REDDIT_PROPOSAL_COMMENT_APPROVED % (str(vote_yes), str(vote_no)))
-                    
-                    # Update the proposal instance to reflect the result.
-                    proposal_object.update_status(3)
-                    proposal_object.update_date_completed()
-                # If there are more 'no' than 'yes'.
-                if vote_no > vote_yes:
-                    print "Proposal Rejected, ", str(vote_no) + ":" + str(vote_yes)
-                    
-                    # Update the comment to reflect the result.
-                    proposal_object.update_status(3)
-                    proposal_object.update_date_completed()
-
-                    # Update the proposal instance to reflect the result.
-                    s.edit(settings.REDDIT_PROPOSAL_COMMENT_REJECTED % (str(vote_no), str(vote_yes)))
-                # Update the proposal instance
-                proposal_container[pretty_itty] = proposal_object
-            else:
-                print "Incomplete vote, unable to decide"
-
-        # End of processing
-        print "Sleeping for 100s"
-        time.sleep(100)
-        print "Pickling data to file"
-        prop_obj = open( "proposal_container.obj", "wb" )
-        pickle.dump(proposal_container, prop_obj)
-        prop_obj.close()
 
 
 def populate_wiki():
